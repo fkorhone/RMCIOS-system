@@ -90,7 +90,7 @@ struct control_data
    struct context_rmcios context;
    int index;                   // Command line
    int direct_channel;
-   char command[100];           // Command line buffer
+   char command[256];           // Command line buffer
 } cdata =
 {
    {
@@ -928,8 +928,8 @@ void as_class_func (void *data,
    struct buffer_rmcios *params = param.bv;
    int destination = param_to_int (context, paramtype, param, 0);
    int execute_channel = param_to_int (context, paramtype, param, 1);
-
    if (paramtype == channel_rmcios || paramtype == buffer_rmcios)
+   // @TODO other parameter types.
    {
       context->run_channel (context, execute_channel, function,
                             channel_rmcios,
