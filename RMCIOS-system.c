@@ -283,15 +283,14 @@ struct exec_queue *allocate_exec_queue_item (const struct context_rmcios
    else
       newitem->returnv = (union param_rmcios) 0;
    newitem->num_params = num_params;
-   newitem->param = (const union param_rmcios) (newitem->param.p + 1);
+   newitem->param = (const union param_rmcios) (((void *)(newitem)) + sizeof(newitem) );
 
    // Copy parameter data:
    if (paramtype == buffer_rmcios || paramtype == channel_rmcios)
    {
       int offset = 0;
       // Copy buffer parameters:
-      void *pdata =
-         newitem->param.p + num_params * sizeof (struct buffer_rmcios);
+      void *pdata = newitem->param.p + num_params * sizeof (struct buffer_rmcios);
       memcopy (newitem->param.p, param.p,
                num_params * sizeof (struct buffer_rmcios));
 
@@ -308,9 +307,10 @@ struct exec_queue *allocate_exec_queue_item (const struct context_rmcios
    else if (paramtype == int_rmcios)
       memcopy (newitem->param.p, param.p, num_params * sizeof (int));
    else if (paramtype == float_rmcios)
-      memcopy (newitem->param.p, param.p, num_params * sizeof (float));
+      memcopy ((float *)newitem->param.p, param.p, num_params * sizeof (float));
    else
       write_str (context, context->report, "other param!\r\n", 0);
+
    return newitem;
 }
 
@@ -436,6 +436,7 @@ void linked_func (void *data, const struct context_rmcios *context,
 int lock_channel (const struct context_rmcios *context, int channel,
                   enum function_rmcios function)
 {
+	
    // Check if channel is locked:
    if (((struct ch_system_data *) context->data)->share_registers[channel] >= 0)
    {
@@ -510,43 +511,24 @@ void run_exec_queue (const struct context_rmcios *context, int channel)
             return;
 
          // Pop the exec queue (with atomic race condition check):
-         if (__sync_bool_compare_and_swap
-             ((int *) &((struct ch_system_data *) context->data)->
+         if (__sync_bool_compare_and_swap(
+              (int *) &((struct ch_system_data *) context->data)->
               exec_queues[channel], que, que->next) != 1)
          {
             // Racing condition
             write_str (context, context->report,
                        "ERRROR! exec queue RACE!\r\n", 0);
             // Unlock the channel
-            if (((struct ch_system_data *) context->data)->
-                share_registers[channel] >= 0)
-            {
-               if (que->function == read_rmcios
-                   || que->function == create_rmcios)
-               {        // SEMI-LOCKING operation
-                  // Unlock the channel from reading
-                  stop_read_resource (&
-                                      ((struct ch_system_data
-                                        *) context->data)->
-                                      share_registers[channel]);
-               }
-               else if (que->function == write_rmcios
-                        || que->function == setup_rmcios)
-               {
-                  // Unlock the channel from writing
-                  stop_write_resource (&
-                                       ((struct ch_system_data
-                                         *) context->data)->
-                                       share_registers[channel]);
-               }
-            }
+            unlock_channel(context, channel, que->function) ;
             return;
          }
          //exec_items-- ;
 
          // Execute from queue
-         ((struct ch_system_data *) context->data)->
-            functions[func_index] (channel_data, que->context,
+         struct ch_system_data *cdata ; 
+		 cdata= ((struct ch_system_data *)  context->data);
+		 class_rmcios about_to_call=cdata->functions[func_index] ;
+		 about_to_call(channel_data, que->context,
                                    channel, que->function,
                                    que->paramtype, que->returnv,
                                    que->num_params, que->param);
@@ -620,14 +602,14 @@ void run_channel_ (const struct context_rmcios *context,
       //printf("Locked -> to queue\r\n") ;
       if (((struct ch_system_data *) context->data)->exec_queues[channel] == 0)
       {
-         struct exec_queue *newque =
-            allocate_exec_queue_item (context, function, paramtype,
+         struct exec_queue *newque ;
+         newque= allocate_exec_queue_item (context, function, paramtype,
                                       returnv, num_params, param);
          if (__sync_bool_compare_and_swap
              ((int *) &((struct ch_system_data *) context->data)->
               exec_queues[channel], 0, newque) == 0)
          {
-            write_str (context, context->report, "EXEC RACE\r\n", 0);
+            write_str (context, context->report, "EXEC RACE!\r\n", 0);
          }
       }
       else
@@ -641,18 +623,18 @@ void run_channel_ (const struct context_rmcios *context,
          newque =
             allocate_exec_queue_item (context, function, paramtype,
                                       returnv, num_params, param);
+
          // Add the item to end of queue
-         if (__sync_bool_compare_and_swap ((int *) que->next, 0, newque) == 0)
+         if (__sync_bool_compare_and_swap (&que->next, 0, newque) == 0)
             write_str (context, context->report, "EXEC RACE!\r\n", 0);
-         //que->next= allocate_exec_queue_item(context,function,
-         //                          paramtype,returnv,num_params,param) ;
       }
    }
    else
    {
       // Call channel
-      ((struct ch_system_data *) context->data)->
-         functions[func_index] (channel_data, context, call_channel,
+      struct ch_system_data * cdata ;
+      cdata= ((struct ch_system_data *) context->data) ;
+      cdata->functions[func_index] (channel_data, context, call_channel,
                                 function, paramtype, returnv, num_params,
                                 param);
 
