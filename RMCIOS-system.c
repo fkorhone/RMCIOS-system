@@ -60,7 +60,7 @@ void run_channel_ (const struct context_rmcios *context,
                    int channel,
                    enum function_rmcios function,
                    enum type_rmcios paramtype,
-                   union param_rmcios returnv,
+                   struct combo_rmcios *returnv,
                    int num_params, const union param_rmcios param);
 
 int create_channel_ (const struct context_rmcios *context,
@@ -103,45 +103,64 @@ struct control_data
 void channels_class_func (void *data, const struct context_rmcios *context,
                           int id, enum function_rmcios function,
                           enum type_rmcios paramtype,
-                          union param_rmcios returnv, int num_params,
+                          struct combo_rmcios *returnv, 
+                          int num_params,
                           const union param_rmcios param);
+
 void as_class_func (void *data, const struct context_rmcios *context, int id,
                     enum function_rmcios function, enum type_rmcios paramtype,
-                    union param_rmcios returnv, int num_params,
+                    struct combo_rmcios *returnv, 
+                    int num_params,
                     const union param_rmcios param);
+
 void lock_func (void *data, const struct context_rmcios *context, int id,
                 enum function_rmcios function, enum type_rmcios paramtype,
-                union param_rmcios returnv, int num_params,
+                struct combo_rmcios *returnv, 
+                int num_params,
                 const union param_rmcios param);
+
 void name_func (void *data, const struct context_rmcios *context, int id,
                 enum function_rmcios function, enum type_rmcios paramtype,
-                union param_rmcios returnv, int num_params,
+                struct combo_rmcios *returnv, 
+                int num_params,
                 const union param_rmcios param);
+
 void id_func (void *data, const struct context_rmcios *context, int id,
               enum function_rmcios function, enum type_rmcios paramtype,
-              union param_rmcios returnv, int num_params,
+              struct combo_rmcios *returnv, 
+              int num_params,
               const union param_rmcios param);
+
 void mem_func (void *data, const struct context_rmcios *context, int id,
                enum function_rmcios function, enum type_rmcios paramtype,
-               union param_rmcios returnv, int num_params,
+               struct combo_rmcios *returnv, 
+               int num_params,
                const union param_rmcios param);
+
 void control_class_func (struct control_data *this,
                          const struct context_rmcios *context, int id,
                          enum function_rmcios function,
                          enum type_rmcios paramtype,
-                         union param_rmcios returnv, int num_params,
+                         struct combo_rmcios *returnv, 
+                         int num_params,
                          const union param_rmcios param);
+
 void stdout_func (void *data, const struct context_rmcios *context, int id,
                   enum function_rmcios function, enum type_rmcios paramtype,
-                  union param_rmcios returnv, int num_params,
+                  struct combo_rmcios *returnv, 
+                  int num_params,
                   const union param_rmcios param);
+
 void link_func (void *data, const struct context_rmcios *context, int id,
                 enum function_rmcios function, enum type_rmcios paramtype,
-                union param_rmcios returnv, int num_params,
+                struct combo_rmcios *returnv, 
+                int num_params,
                 const union param_rmcios param);
+
 void linked_func (void *data, const struct context_rmcios *context, int id,
                   enum function_rmcios function, enum type_rmcios paramtype,
-                  union param_rmcios returnv, int num_params,
+                  struct combo_rmcios *returnv, 
+                  int num_params,
                   const union param_rmcios param);
 
 int channels = 0;
@@ -241,7 +260,7 @@ struct exec_queue *allocate_exec_queue_item (const struct context_rmcios
                                              *context,
                                              enum function_rmcios function,
                                              enum type_rmcios paramtype,
-                                             union param_rmcios returnv,
+                                             struct combo_rmcios *returnv,
                                              int num_params,
                                              const union param_rmcios param)
 {
@@ -318,13 +337,13 @@ void link_func (void *data,
                 const struct context_rmcios *context, int id,
                 enum function_rmcios function,
                 enum type_rmcios paramtype,
-                union param_rmcios returnv,
+                struct combo_rmcios *returnv,
                 int num_params, const union param_rmcios param)
 {
    switch (function)
    {
    case help_rmcios:
-      return_string (context, paramtype, returnv,
+      return_string (context, returnv,
                      "link channel - channel for linking channels\r\n"
                      "read link channel\r\n"
                      " -returns channel link representation channel\r\n"
@@ -337,7 +356,7 @@ void link_func (void *data,
 
    case read_rmcios:
       // Negative id is the link representative channel
-      return_int (context, paramtype, returnv,
+      return_int (context, returnv,
                   ~param_to_int (context, paramtype, param, 0));
       break;
 
@@ -353,13 +372,14 @@ void link_func (void *data,
 
 void linked_func (void *data, const struct context_rmcios *context,
                   int channel, enum function_rmcios function,
-                  enum type_rmcios paramtype, union param_rmcios returnv,
+                  enum type_rmcios paramtype, 
+                  struct combo_rmcios *returnv,
                   int num_params, const union param_rmcios param)
 {
    switch (function)
    {
    case help_rmcios:
-      return_string (context, paramtype, returnv,
+      return_string (context, returnv,
                      "linked channel - channel for managing calls to"
                      " linked channels. \r\n"
                      "setup linked channel data...\r\n"
@@ -550,7 +570,7 @@ void run_channel_ (const struct context_rmcios *context,
                    int channel,
                    enum function_rmcios function,
                    enum type_rmcios paramtype,
-                   union param_rmcios returnv,
+                   struct combo_rmcios *returnv,
                    int num_params, const union param_rmcios param)
 {
    int func_index;
@@ -604,7 +624,7 @@ void run_channel_ (const struct context_rmcios *context,
       {
          struct exec_queue *newque ;
          newque= allocate_exec_queue_item (context, function, paramtype,
-                                      returnv, num_params, param);
+                                           returnv, num_params, param);
          if (__sync_bool_compare_and_swap
              ((int *) &((struct ch_system_data *) context->data)->
               exec_queues[channel], 0, newque) == 0)
@@ -835,7 +855,7 @@ void channels_class_func (void *data,
                           const struct context_rmcios *context, int id,
                           enum function_rmcios function,
                           enum type_rmcios paramtype,
-                          union param_rmcios returnv,
+                          struct combo_rmcios *returnv,
                           int num_params, const union param_rmcios param)
 {
    switch (function)
@@ -848,14 +868,14 @@ void channels_class_func (void *data,
          {      // Iterate through channels
             if (s[1] != 0)
             {
-               return_string (context, paramtype, returnv, *s);
-               return_string (context, paramtype, returnv, "\n");
+               return_string (context, returnv, *s);
+               return_string (context, returnv, "\n");
                int ch = channel_enum (context, *s);
                if (ch != channels)
                   context->run_channel (context, ch, help_rmcios,
                                         paramtype, returnv, 0,
                                         (const union param_rmcios) 0);
-               return_string (context, paramtype, returnv, "\n");
+               return_string (context, returnv, "\n");
             }
             s += 2;
          }
@@ -870,18 +890,18 @@ void channels_class_func (void *data,
          {
             if (s[1] != 0)
             {
-               return_string (context, paramtype, returnv, *s);
-               return_string (context, paramtype, returnv, " ");
+               return_string (context, returnv, *s);
+               return_string (context, returnv, " ");
             }
             s += 2;
          }
-         return_string (context, paramtype, returnv, "total=");
-         return_int (context, paramtype, returnv,
+         return_string (context, returnv, "total=");
+         return_int (context, returnv,
                      ((int)
                       (s -
                        ((struct ch_system_data *) context->data)->
                        channel_enum_pattern)) / 2);
-         return_string (context, paramtype, returnv, " ");
+         return_string (context, returnv, " ");
       }
       break;
    }
@@ -894,14 +914,14 @@ void as_class_func (void *data,
                     const struct context_rmcios *context, int id,
                     enum function_rmcios function,
                     enum type_rmcios paramtype,
-                    union param_rmcios returnv,
+                    struct combo_rmcios *returnv,
                     int num_params, const union param_rmcios param)
 {
    if (num_params < 2)
    {
       if (function == help_rmcios)
       {
-         return_string (context, paramtype, returnv,
+         return_string (context, returnv,
                         "as channel - redirect call return data\r\n"
                         "read as destination channel params...\r\n");
       }
@@ -925,14 +945,14 @@ void lock_func (void *data,
                 const struct context_rmcios *context, int id,
                 enum function_rmcios function,
                 enum type_rmcios paramtype,
-                union param_rmcios returnv,
+                struct combo_rmcios *returnv,
                 int num_params, const union param_rmcios param)
 {
    int ch;
    switch (function)
    {
    case help_rmcios:
-      return_string (context, paramtype, returnv,
+      return_string (context, returnv,
                      "lock channel -" 
                      " read and write channel multiaccess register\r\n"
                      "read lock channel # Read current lock status\r\n"
@@ -947,7 +967,7 @@ void lock_func (void *data,
       if (num_params < 1)
          break;
       ch = param_to_int (context, paramtype, param, 0);
-      return_int (context, paramtype, returnv,
+      return_int (context, returnv,
                   ((struct ch_system_data *) context->data)->
                   share_registers[ch]);
       break;
@@ -956,7 +976,7 @@ void lock_func (void *data,
       if (num_params == 1)
       {
          ch = param_to_int (context, paramtype, param, 0);
-         return_int (context, paramtype, returnv,
+         return_int (context, returnv,
                      ((struct ch_system_data *) context->data)->
                      share_registers[ch]);
       }
@@ -982,14 +1002,14 @@ void name_func (void *data,
                 const struct context_rmcios *context, int id,
                 enum function_rmcios function,
                 enum type_rmcios paramtype,
-                union param_rmcios returnv,
+                struct combo_rmcios *returnv,
                 int num_params, const union param_rmcios param)
 {
    int p0len, p1len;
    switch (function)
    {
    case help_rmcios:
-      return_string (context, paramtype, returnv,
+      return_string (context, returnv,
                      "name channel - Rename, and read channel names\r\n"
                      "write name channelname newname\r\n"
                      " -Adds a new name for channel\r\n"
@@ -1042,7 +1062,7 @@ void name_func (void *data,
                 channel_enum_pattern[i + 1] == ((const char *) channel_enum))
             {
                // Return the name
-               return_string (context, paramtype, returnv,
+               return_string (context, returnv,
                               ((struct ch_system_data *) context->data)->
                               channel_enum_pattern[i]);
             }
@@ -1057,7 +1077,7 @@ void id_func (void *data,
               const struct context_rmcios *context, int id,
               enum function_rmcios function,
               enum type_rmcios paramtype,
-              union param_rmcios returnv,
+              struct combo_rmcios *returnv,
               int num_params, const union param_rmcios param)
 {
    int i;
@@ -1070,7 +1090,7 @@ void id_func (void *data,
    switch (function)
    {
    case help_rmcios:
-      return_string (context, paramtype, returnv,
+      return_string (context, returnv,
                      "id channel - Channel for getting id for a channel\r\n"
                      "write id channel newname\r\n"
                      "read id channel\r\n"
@@ -1130,7 +1150,7 @@ void id_func (void *data,
          }
 
       }
-      return_int (context, paramtype, returnv, ireturn);
+      return_int (context, returnv, ireturn);
       break;
    }
 }
@@ -1142,7 +1162,6 @@ void id_func (void *data,
 ///////////////////////////////////////////////////////////////////////
 
 // executes one line from input text.
-// puts output to returnv according to enum paramtype.
 // "link ch 0 #detaches channel from all linked channels"
 // "link ch linkch #adds linked to linked channels for specific channel" 
 // "link ch notexisting # must not detach channels"
@@ -1152,7 +1171,7 @@ void id_func (void *data,
 //
 int execute (const struct context_rmcios *context,
              const char *input,
-             enum type_rmcios paramtype, union param_rmcios returnv)
+             enum type_rmcios paramtype, struct combo_rmcios *returnv)
 {
    int linelen;
    int i, param_i = -1;
@@ -1352,19 +1371,19 @@ int execute (const struct context_rmcios *context,
       else if (function == link_rmcios)
          context->run_channel (context, context->link,
                                write_rmcios, paramtype,
-                               (union param_rmcios) returnv,
+                               returnv,
                                param_i, (const union param_rmcios) sparam);
 
       else
          context->run_channel (context, channel,
                                function, paramtype,
-                               (union param_rmcios) returnv,
+                               returnv,
                                param_i - 1,
                                (const union param_rmcios) (sparam + 1));
 
-      return_string (context, paramtype, returnv, "\r\n");
+      return_string (context, returnv, "\r\n");
       // return void to signal buffer flushing
-      return_void (context, paramtype, returnv);      
+      return_void (context, returnv);      
    }
    return 0;
 }
@@ -1373,14 +1392,14 @@ void control_class_func (struct control_data *this,
                          const struct context_rmcios *context, int id,
                          enum function_rmcios function,
                          enum type_rmcios paramtype,
-                         union param_rmcios returnv,
+                         struct combo_rmcios returnv,
                          int num_params, const union param_rmcios param)
 {
    int plen;
    switch (function)
    {
    case help_rmcios:
-      return_string (context, paramtype, returnv,
+      return_string (context, returnv,
                      "help for system control channel\r\n"
                      "   create control newname\r\n"
                      "   setup control namespace\r\n"
