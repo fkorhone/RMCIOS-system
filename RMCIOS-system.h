@@ -57,7 +57,7 @@ extern "C"
         struct context_rmcios *context;
         enum function_rmcios function;
         enum type_rmcios paramtype;
-        union param_rmcios returnv;
+        struct combo_rmcios *returnv;
         int num_params;
         union param_rmcios param;
         // param_data_offset start
@@ -97,9 +97,13 @@ extern "C"
 
     // memory allocation channel.
     // To be defined outside of channel system operating scope
-    void mem_func (void *data, const struct context_rmcios *context, int id,
-                   enum function_rmcios function, enum type_rmcios paramtype,
-                   union param_rmcios returnv, int num_params,
+    void mem_func (void *data, 
+                   const struct context_rmcios *context, 
+                   int id,
+                   enum function_rmcios function, 
+                   enum type_rmcios paramtype,
+                   struct combo_rmcios *returnv,
+                   int num_params,
                    const union param_rmcios param);
 
 // Macro for creating/allocating static channelsystem data 
@@ -162,7 +166,7 @@ extern "C"
                       const union param_rmcios param);
 
     int execute (const struct context_rmcios *context, const char *input,
-                 enum type_rmcios paramtype, union param_rmcios returnv);
+                 struct combo_rmcios *returnv);
 
 #ifdef __cplusplus
 }

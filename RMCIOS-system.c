@@ -34,6 +34,7 @@ along with RMCIOS.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "RMCIOS-system.h"
 #include "stream_search.h"
+#include "shared_resource.h"
 
 // Add new class function to the system. return the id.
 int add_class_func (const struct context_rmcios *context,
@@ -71,7 +72,6 @@ int create_channel_ (const struct context_rmcios *context,
 struct context_rmcios funcs = {
    sizeof (struct context_rmcios),
    run_channel_,
-   create_channel_,
    0,   // System data NULL
    1,   // id - Channel for reading channel identifier number.
    2,   // name - Channel for reading channel name.
@@ -81,8 +81,9 @@ struct context_rmcios funcs = {
    6,   // warning - Channel for warning messages.
    7,   // report - Channel for reporting/logging status messages.
    8,   // control - Channel for text based control.
-   9,   // link - Channel for creating links
-   10,  // linked - Channel for interacting with linked channels-
+   9,   // link - Channel for creating links.
+   10,  // linked - Channel for interacting with linked channels.
+   11,  // create - Channel for creating channels.
 };
 
 struct control_data
@@ -163,6 +164,15 @@ void linked_func (void *data, const struct context_rmcios *context, int id,
                   int num_params,
                   const union param_rmcios param);
 
+void create_class_func (void *data, 
+                        const struct context_rmcios *context, 
+                        int id,
+                        enum function_rmcios function, 
+                        enum type_rmcios paramtype,
+                        struct combo_rmcios *returnv, 
+                        int num_params,
+                        const union param_rmcios param);
+
 int channels = 0;
 
 const struct context_rmcios *get_rmios_context (void)
@@ -186,26 +196,17 @@ void set_channel_system_data (struct ch_system_data *p_data)
    funcs.data = (void *) p_data;
 
    // INTERFACE channels : 
-   p_data->channel_functions[funcs.report] =
-      add_class_func (&funcs, (class_rmcios) stdout_func);
-   p_data->channel_functions[funcs.warning] =
-      add_class_func (&funcs, (class_rmcios) stdout_func);
-   p_data->channel_functions[funcs.errors] =
-      add_class_func (&funcs, (class_rmcios) stdout_func);
-   p_data->channel_functions[funcs.mem] =
-      add_class_func (&funcs, (class_rmcios) mem_func);
-   p_data->channel_functions[funcs.quemem] =
-      add_class_func (&funcs, (class_rmcios) mem_func);
-   p_data->channel_functions[funcs.name] =
-      add_class_func (&funcs, (class_rmcios) name_func);
-   p_data->channel_functions[funcs.id] =
-      add_class_func (&funcs, (class_rmcios) id_func);
-   p_data->channel_functions[funcs.control] =
-      add_class_func (&funcs, (class_rmcios) control_class_func);
-   p_data->channel_functions[funcs.link] =
-      add_class_func (&funcs, (class_rmcios) link_func);
-   p_data->channel_functions[funcs.linked] =
-      add_class_func (&funcs, (class_rmcios) linked_func);
+   p_data->channel_functions[funcs.report] = add_class_func (&funcs, (class_rmcios) stdout_func);
+   p_data->channel_functions[funcs.warning] =add_class_func (&funcs, (class_rmcios) stdout_func);
+   p_data->channel_functions[funcs.errors] = add_class_func (&funcs, (class_rmcios) stdout_func);
+   p_data->channel_functions[funcs.mem] =    add_class_func (&funcs, (class_rmcios) mem_func);
+   p_data->channel_functions[funcs.quemem] = add_class_func (&funcs, (class_rmcios) mem_func);
+   p_data->channel_functions[funcs.name] =   add_class_func (&funcs, (class_rmcios) name_func);
+   p_data->channel_functions[funcs.id] =     add_class_func (&funcs, (class_rmcios) id_func);
+   p_data->channel_functions[funcs.control] =add_class_func (&funcs, (class_rmcios) control_class_func);
+   p_data->channel_functions[funcs.link] =   add_class_func (&funcs, (class_rmcios) link_func);
+   p_data->channel_functions[funcs.linked] = add_class_func (&funcs, (class_rmcios) linked_func);
+   p_data->channel_functions[funcs.create] = add_class_func (&funcs, (class_rmcios) create_class_func);
    p_data->channel_datas[funcs.control] = &cdata;
    p_data->share_registers[funcs.id] = -1;
    // Simultanous calls to linked in the whole system allowed.
@@ -214,9 +215,9 @@ void set_channel_system_data (struct ch_system_data *p_data)
    p_data->share_registers[funcs.control] = -1;
    add_channel_enum (&funcs, "control", funcs.control);
 
-   channels =
-      create_channel_str (&funcs, "channels",
-                          (class_rmcios) channels_class_func, 0L);
+   channels = create_channel_str (&funcs, "channels",
+                                  (class_rmcios) channels_class_func, 0L);
+   
    create_channel_str (&funcs, "name", (class_rmcios) name_func, 0);
    create_channel_str (&funcs, "id", (class_rmcios) id_func, 0);
    create_channel_str (&funcs, "as", (class_rmcios) as_class_func, 0);
@@ -243,7 +244,9 @@ int create_channel_ (const struct context_rmcios *context,
    {
       ID = add_channel (context, function_id, data);
       if (ID != 0)
+      {
          add_channel_enum (context, namebuffer, ID);
+      }
    }
    else
       // channel with name already exists -> do only update
@@ -298,9 +301,13 @@ struct exec_queue *allocate_exec_queue_item (const struct context_rmcios
    newitem->function = function;
    newitem->paramtype = paramtype;
    if (paramtype != buffer_rmcios)
+   {
       newitem->returnv = returnv;
+   }
    else
-      newitem->returnv = (union param_rmcios) 0;
+   {
+      newitem->returnv = 0;
+   }
    newitem->num_params = num_params;
    newitem->param = (const union param_rmcios) (((void *)(newitem)) + sizeof(newitem) );
 
@@ -324,9 +331,13 @@ struct exec_queue *allocate_exec_queue_item (const struct context_rmcios
       }
    }
    else if (paramtype == int_rmcios)
+   {
       memcopy (newitem->param.p, param.p, num_params * sizeof (int));
+   }
    else if (paramtype == float_rmcios)
-      memcopy ((float *)newitem->param.p, param.p, num_params * sizeof (float));
+   {
+      memcopy (newitem->param.p, param.p, num_params * sizeof (float));
+   }
    else
       write_str (context, context->report, "other param!\r\n", 0);
 
@@ -379,12 +390,12 @@ void linked_func (void *data, const struct context_rmcios *context,
    switch (function)
    {
    case help_rmcios:
-      return_string (context, returnv,
+     /* return_string (context, returnv,
                      "linked channel - channel for managing calls to"
                      " linked channels. \r\n"
                      "setup linked channel data...\r\n"
                      "write linked channel data...\r\n"
-                     "read linked channel data...\r\n");
+                     "read linked channel data...\r\n");*/
    case setup_rmcios:
    case read_rmcios:
    case write_rmcios:
@@ -407,7 +418,6 @@ void linked_func (void *data, const struct context_rmcios *context,
                     "Channel class > max_classes\r\n", 0);
          return;
       }
-      //printf("linked call: %d\r\n", channel) ;
 
       int *link =
          ((struct ch_system_data *) context->data)->channel_linked[channel];
@@ -428,21 +438,23 @@ void linked_func (void *data, const struct context_rmcios *context,
             int from_function = ((*link) >> (32 - 3)) & 0x07;
             int to_function = ((*link) >> (32 - 6)) & 0x07;
             int linked_channel = *link & 0x03ff;
-            //printf("%d,",linked_channel) ;
             // Filter called functions to execute with this link:
             if (from_function == 0 || from_function == function)
             {
                // run the called function
-               //printf("%x",context->run_channel) ;
                if (to_function == 0)
+               {
                   context->run_channel (context, linked_channel,
                                         function, paramtype,
                                         returnv, num_params, param);
-               // redirected function
+               }
                else
+               {
+                  // redirected function
                   context->run_channel (context, linked_channel,
                                         to_function, paramtype,
                                         returnv, num_params, param);
+               }
             }
             link++;
          }
@@ -927,17 +939,24 @@ void as_class_func (void *data,
       }
       return;
    }
-   struct buffer_rmcios *params = param.bv;
-   int destination = param_to_int (context, paramtype, param, 0);
+
+   struct combo_rmcios rvalue= {
+      .paramtype = channel_rmcios,
+      .num_params = 1,
+      .param.channel = param_to_channel (context, paramtype, param, 0)
+   };
+
    int execute_channel = param_to_int (context, paramtype, param, 1);
-   if (paramtype == channel_rmcios || paramtype == buffer_rmcios)
-   // @TODO other parameter types.
+   
+   if (paramtype == buffer_rmcios && num_params > 2)
    {
-      context->run_channel (context, execute_channel, function,
-                            channel_rmcios,
-                            (union param_rmcios) destination,
+      context->run_channel (context, 
+                            execute_channel, 
+                            function,
+                            buffer_rmcios,
+                            &rvalue,
                             num_params - 2,
-                            (const union param_rmcios) (params + 2));
+                            (const union param_rmcios) &param.bv[2]);
    }
 }
 
@@ -1027,8 +1046,7 @@ void name_func (void *data,
 
          // Allocate memory for the new name
          char *newname = allocate_storage (context, p1len, 0);
-         channelname =
-            param_to_string (context, paramtype, param, 0, p0len, buffer0);
+         channelname = param_to_string (context, paramtype, param, 0, p0len, buffer0);
 
          param_to_string (context, paramtype, param, 1, p1len, newname);
          // Add the new name
@@ -1135,20 +1153,25 @@ void id_func (void *data,
          ch_name = param_to_string (context, paramtype, param, 0,
                                     blen, buffer);
          for (i = 0; i < channel_state_registers; i++)
+         {
             states[i] = ~(0);   // reset state registers
+         }
          i = 0;
-         while (states > 0)
+
+         
+         while (states > (unsigned int *)0)
          {
             if (ch_name[i] == 0 || ch_name[i] == ' ')
+            {
                break;
+            }
             ireturn = 0;
-            ireturn =
-               (int) search (i, states,
-                             ((struct ch_system_data *) context->
-                              data)->channel_enum_pattern, ch_name[i]);
+            ireturn = (int) search (i, states,
+                                    ((struct ch_system_data *) 
+                                    context->data)->channel_enum_pattern, 
+                                    ch_name[i]);
             i++;
          }
-
       }
       return_int (context, returnv, ireturn);
       break;
@@ -1171,7 +1194,7 @@ void id_func (void *data,
 //
 int execute (const struct context_rmcios *context,
              const char *input,
-             enum type_rmcios paramtype, struct combo_rmcios *returnv)
+             struct combo_rmcios *returnv)
 {
    int linelen;
    int i, param_i = -1;
@@ -1184,6 +1207,7 @@ int execute (const struct context_rmcios *context,
    char direct = 0;
    int hex = -2;
    char bstr = 0;
+   
    for (linelen = 0; input[linelen] != 0; linelen++)
    {
       if (prev != '\\' && input[linelen] == '\"')
@@ -1369,17 +1393,25 @@ int execute (const struct context_rmcios *context,
       }
       // Convert link channel to > write link channel to
       else if (function == link_rmcios)
-         context->run_channel (context, context->link,
-                               write_rmcios, paramtype,
+      {
+         context->run_channel (context, 
+                               context->link,
+                               write_rmcios, 
+                               buffer_rmcios,
                                returnv,
-                               param_i, (const union param_rmcios) sparam);
-
+                               param_i, 
+                               (const union param_rmcios) sparam);
+      }
       else
-         context->run_channel (context, channel,
-                               function, paramtype,
+      {
+         context->run_channel (context, 
+                               channel,
+                               function, 
+                               buffer_rmcios,
                                returnv,
                                param_i - 1,
                                (const union param_rmcios) (sparam + 1));
+      }
 
       return_string (context, returnv, "\r\n");
       // return void to signal buffer flushing
@@ -1392,7 +1424,7 @@ void control_class_func (struct control_data *this,
                          const struct context_rmcios *context, int id,
                          enum function_rmcios function,
                          enum type_rmcios paramtype,
-                         struct combo_rmcios returnv,
+                         struct combo_rmcios *returnv,
                          int num_params, const union param_rmcios param)
 {
    int plen;
@@ -1451,8 +1483,8 @@ void control_class_func (struct control_data *this,
          char buffer[plen];
          const char *filename;
          // get/form the filename string
-         filename =
-            param_to_string (context, paramtype, param, 0, plen, buffer);
+         filename = param_to_string (context, paramtype, param, 
+                                     0, plen, buffer);
          struct buffer_rmcios p;
          p.data = (char *) filename;
          p.size = 0;
@@ -1460,11 +1492,19 @@ void control_class_func (struct control_data *this,
          for (slen = 0; filename[slen] != 0; slen++);   // strlen(filename)
          p.length = slen;
 
+         struct combo_rmcios rvalue = {
+            .paramtype = channel_rmcios,
+            .num_params = 1,
+            .param.channel = channel_enum (context, "control")
+         };
+
          // Read file to control channel: 
-         context->run_channel (context, channel_enum (context, "file"),
-                               read_rmcios, channel_rmcios,
-                               (union param_rmcios)
-                               channel_enum (context, "control"), 1,
+         context->run_channel (context, 
+                               channel_enum (context, "file"),
+                               read_rmcios, 
+                               buffer_rmcios,
+                               &rvalue, 
+                               1,
                                (const union param_rmcios) &p);
       }
       break;
@@ -1501,8 +1541,7 @@ void control_class_func (struct control_data *this,
                   this->command[this->index] = 0;       // NULL character
                   this->index = 0;      // record new command
 
-                  this->direct_channel =
-                     execute (context, this->command, paramtype, returnv);
+                  this->direct_channel = execute (context, this->command, returnv);
                   if (this->direct_channel != 0)
                      direct_start = i + 1;
                }
@@ -1534,3 +1573,86 @@ void control_class_func (struct control_data *this,
       break;
    }
 }
+
+void create_class_func (void *this,
+                        const struct context_rmcios *context, 
+                        int id,
+                        enum function_rmcios function,
+                        enum type_rmcios paramtype,
+                        struct combo_rmcios *returnv,
+                        int num_params, 
+                        const union param_rmcios param)
+{
+   int bufflen;
+   switch (function)
+   {
+   case help_rmcios:
+      return_string (context, returnv,
+                     "Channel for creating new channels\r\n"
+                     "This channel is not to be called directly!"
+                     " parameters: name function_pointer data_pointer\r\n");
+      break;
+
+   case create_rmcios:
+      if(num_params < 3) 
+      {
+         break;
+      }
+      bufflen = param_string_alloc_size(context, paramtype, param, 0);
+      {
+         char namebuffer[bufflen];
+         const char *name = param_to_string(context, paramtype, param, 0, 
+               bufflen, namebuffer);
+         int class_ptr_size = param_binary_length(context, paramtype, param, 1);
+         int data_ptr_size = param_binary_length(context, paramtype, param, 2);
+         class_rmcios class_func;
+         void *data;
+
+
+         if(class_ptr_size != sizeof(class_func) ||  data_ptr_size != sizeof(void *) )
+         {
+            write_str (context, context->errors,
+                  "ERROR! Attemp of creating channel with incompatible"
+                  "pointer parameter size", 0);
+         }
+
+         param_to_binary (context, paramtype, param, 1, 
+                          sizeof(class_func), &class_func);
+
+         param_to_binary (context, paramtype, param, 2, 
+                          sizeof(void *), &data);
+
+         int ID;
+         int function_id;
+         function_id = add_class_func (context, class_func);
+
+         if ((ID = channel_enum (context, (char *) name)) == 0)
+         {
+            // Channel with this name does not exist
+            ID = add_channel (context, function_id, data);
+            if (ID != 0)
+            {
+               // Allocate memory for the new name
+               int namelen = param_string_length(context, paramtype, param, 0);
+               char *newname = allocate_storage (context, namelen+1, 0);
+
+               // Copy name to the value:
+               param_to_string (context, paramtype, param, 0, namelen+1, newname);
+
+               add_channel_enum (context, newname, ID);
+            }
+         }
+         else
+         {
+            // channel with name already exists -> do only update
+            write_str (context, context->report, "updating:", 0);
+            write_str (context, context->report, name, 0);
+            write_str (context, context->report, "\n", 0);
+            update_channel (context, ID, function_id, data);
+         }
+         return_int(context, returnv, ID);
+      }
+      break;
+   }
+}
+
