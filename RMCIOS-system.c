@@ -57,7 +57,8 @@ int link_channel_param (const struct context_rmcios *context,
                         const union param_rmcios param);
 
 // API FUNCTIONS 
-void run_channel_ (const struct context_rmcios *context,
+void run_channel_ (struct ch_system_data *data,
+                   const struct context_rmcios *context,
                    int channel,
                    enum function_rmcios function,
                    enum type_rmcios paramtype,
@@ -71,7 +72,7 @@ int create_channel_ (const struct context_rmcios *context,
 
 struct context_rmcios funcs = {
    sizeof (struct context_rmcios),
-   run_channel_,
+   (class_rmcios)run_channel_,
    0,   // System data NULL
    1,   // id - Channel for reading channel identifier number.
    2,   // name - Channel for reading channel name.
@@ -211,6 +212,10 @@ void set_channel_system_data (struct ch_system_data *p_data)
    p_data->share_registers[funcs.id] = -1;
    // Simultanous calls to linked in the whole system allowed.
    p_data->share_registers[funcs.linked] = -1;
+   p_data->share_registers[funcs.mem] = -1;
+   p_data->share_registers[funcs.quemem] = -1;
+   p_data->share_registers[funcs.create] = -1;
+   p_data->share_registers[funcs.link] = -1;
    // Simultanous calls to control allowed (Call from self needs to be working.
    p_data->share_registers[funcs.control] = -1;
    add_channel_enum (&funcs, "control", funcs.control);
@@ -274,8 +279,7 @@ struct exec_queue *allocate_exec_queue_item (const struct context_rmcios
    int size = sizeof (struct exec_queue);
 
    // Calculate space for the parameters:
-   if (paramtype == buffer_rmcios || paramtype == channel_rmcios
-       || paramtype == binary_rmcios)
+   if (paramtype == buffer_rmcios || paramtype == binary_rmcios)
    {
       // Space for array structures 
       size += sizeof (struct buffer_rmcios) * num_params;
@@ -286,11 +290,19 @@ struct exec_queue *allocate_exec_queue_item (const struct context_rmcios
          size += param.bv[i].length;
       }
    }
-   else if (paramtype == int_rmcios)
+   else if (paramtype == channel_rmcios)
+   {
       size += num_params * sizeof (int);
+   }
+   else if (paramtype == int_rmcios)
+   {
+      size += num_params * sizeof (int);
+   }
    else if (paramtype == float_rmcios)
+   {
       size += num_params * sizeof (float);
-
+   }
+   
    // Allocate memory for the new item:
    newitem = allocate_storage (context, size, 0);
 
@@ -308,25 +320,30 @@ struct exec_queue *allocate_exec_queue_item (const struct context_rmcios
    {
       newitem->returnv = 0;
    }
+   char *dst = (char *)(newitem) + sizeof(struct exec_queue) ;
    newitem->num_params = num_params;
-   newitem->param = (const union param_rmcios) (((void *)(newitem)) + sizeof(newitem) );
-
+   newitem->param.p = dst;
+   
    // Copy parameter data:
-   if (paramtype == buffer_rmcios || paramtype == channel_rmcios)
+   if (paramtype == buffer_rmcios || paramtype == binary_rmcios)
    {
       int offset = 0;
       // Copy buffer parameters:
-      void *pdata = newitem->param.p + num_params * sizeof (struct buffer_rmcios);
-      memcopy (newitem->param.p, param.p,
+
+      memcopy (dst, param.bv,
                num_params * sizeof (struct buffer_rmcios));
+
+      dst = dst + num_params * sizeof (struct buffer_rmcios);
 
       struct buffer_rmcios *par = param.bv;
       // Copy data
       for (i = 0; i < num_params; i++)
       {
-         memcopy (pdata + offset, par[i].data, par[i].length);
-         newitem->param.bv[i].data = pdata + offset;
+         memcopy (&dst[offset], par[i].data, par[i].length);
+         newitem->param.bv[i].data = &dst[offset];
          newitem->param.bv[i].size = 0;
+         newitem->param.bv[i].length = par[i].length;
+         newitem->param.bv[i].trailing_size = 0;
          offset += par[i].length;
       }
    }
@@ -444,14 +461,14 @@ void linked_func (void *data, const struct context_rmcios *context,
                // run the called function
                if (to_function == 0)
                {
-                  context->run_channel (context, linked_channel,
+                  run_channel (context, linked_channel,
                                         function, paramtype,
                                         returnv, num_params, param);
                }
                else
                {
                   // redirected function
-                  context->run_channel (context, linked_channel,
+                  run_channel (context, linked_channel,
                                         to_function, paramtype,
                                         returnv, num_params, param);
                }
@@ -540,8 +557,9 @@ void run_exec_queue (const struct context_rmcios *context, int channel)
             ((struct ch_system_data *) context->data)->exec_queues[channel];
 
          if (lock_channel (context, channel, que->function) == 0)
+         {
             return;
-
+         }
          // Pop the exec queue (with atomic race condition check):
          if (__sync_bool_compare_and_swap(
               (int *) &((struct ch_system_data *) context->data)->
@@ -554,7 +572,6 @@ void run_exec_queue (const struct context_rmcios *context, int channel)
             unlock_channel(context, channel, que->function) ;
             return;
          }
-         //exec_items-- ;
 
          // Execute from queue
          struct ch_system_data *cdata ; 
@@ -574,17 +591,21 @@ void run_exec_queue (const struct context_rmcios *context, int channel)
       }
       while (((struct ch_system_data *) context->data)
              ->exec_queues[channel] != 0);
+
    }
 }
 
 // API FUNCTION
-void run_channel_ (const struct context_rmcios *context,
-                   int channel,
+void run_channel_ (struct ch_system_data *data,
+                   const struct context_rmcios *context,
+                   int channel_orig,
                    enum function_rmcios function,
                    enum type_rmcios paramtype,
                    struct combo_rmcios *returnv,
                    int num_params, const union param_rmcios param)
 {
+   int channel = channel_orig;
+
    int func_index;
    unsigned int call_channel;
    void *channel_data;
@@ -599,29 +620,24 @@ void run_channel_ (const struct context_rmcios *context,
    else
       call_channel = channel;
 
-   if (call_channel > ((struct ch_system_data *) context->data)->max_channels)
+   if (call_channel > data->max_channels)
    {
       write_str (context, context->warning, "Channel id too big!\r\n", 0);
       return;
    }
-   if (((struct ch_system_data *) context->data)->
-       channel_functions[channel] == 0)
+   if (data->channel_functions[channel] == 0)
    {
       return;
    }
-   if (((struct ch_system_data *) context->data)->
-       channel_functions[channel] >=
-       ((struct ch_system_data *) context->data)->max_classes)
+   if (data->channel_functions[channel] >= data->max_classes)
    {
       write_str (context, context->errors,
                  "Channel class > max_classes\r\n", 0);
       return;
    }
 
-   func_index =
-      ((struct ch_system_data *) context->data)->channel_functions[channel];
-   channel_data =
-      ((struct ch_system_data *) context->data)->channel_datas[channel];
+   func_index = data->channel_functions[channel];
+   channel_data = data->channel_datas[channel];
 
    // Check and run pending operations from execution queue:
    run_exec_queue (context, channel);
@@ -631,15 +647,14 @@ void run_channel_ (const struct context_rmcios *context,
    // Channel was locked -> Add call to queue
    if (execute_later == 1)
    {
-      //printf("Locked -> to queue\r\n") ;
-      if (((struct ch_system_data *) context->data)->exec_queues[channel] == 0)
+      if (data->exec_queues[channel] == 0)
       {
          struct exec_queue *newque ;
          newque= allocate_exec_queue_item (context, function, paramtype,
                                            returnv, num_params, param);
          if (__sync_bool_compare_and_swap
-             ((int *) &((struct ch_system_data *) context->data)->
-              exec_queues[channel], 0, newque) == 0)
+             ( (int *)&(data->exec_queues[channel]), 
+             0, newque) == 0)
          {
             write_str (context, context->report, "EXEC RACE!\r\n", 0);
          }
@@ -647,15 +662,13 @@ void run_channel_ (const struct context_rmcios *context,
       else
       {
          struct exec_queue *newque;
-         struct exec_queue *que =
-            ((struct ch_system_data *) context->data)->exec_queues[channel];
+         struct exec_queue *que = data->exec_queues[channel];
          // Locate end of the que
          while (que->next != 0)
             que = que->next;
          newque =
             allocate_exec_queue_item (context, function, paramtype,
                                       returnv, num_params, param);
-
          // Add the item to end of queue
          if (__sync_bool_compare_and_swap (&que->next, 0, newque) == 0)
             write_str (context, context->report, "EXEC RACE!\r\n", 0);
@@ -665,7 +678,7 @@ void run_channel_ (const struct context_rmcios *context,
    {
       // Call channel
       struct ch_system_data * cdata ;
-      cdata= ((struct ch_system_data *) context->data) ;
+      cdata = data;
       cdata->functions[func_index] (channel_data, context, call_channel,
                                 function, paramtype, returnv, num_params,
                                 param);
@@ -884,7 +897,7 @@ void channels_class_func (void *data,
                return_string (context, returnv, "\n");
                int ch = channel_enum (context, *s);
                if (ch != channels)
-                  context->run_channel (context, ch, help_rmcios,
+                  run_channel (context, ch, help_rmcios,
                                         paramtype, returnv, 0,
                                         (const union param_rmcios) 0);
                return_string (context, returnv, "\n");
@@ -950,7 +963,7 @@ void as_class_func (void *data,
    
    if (paramtype == buffer_rmcios && num_params > 2)
    {
-      context->run_channel (context, 
+      run_channel (context, 
                             execute_channel, 
                             function,
                             buffer_rmcios,
@@ -1394,7 +1407,7 @@ int execute (const struct context_rmcios *context,
       // Convert link channel to > write link channel to
       else if (function == link_rmcios)
       {
-         context->run_channel (context, 
+         run_channel (context, 
                                context->link,
                                write_rmcios, 
                                buffer_rmcios,
@@ -1404,13 +1417,14 @@ int execute (const struct context_rmcios *context,
       }
       else
       {
-         context->run_channel (context, 
+         run_channel (context, 
                                channel,
                                function, 
                                buffer_rmcios,
                                returnv,
                                param_i - 1,
                                (const union param_rmcios) (sparam + 1));
+
       }
 
       return_string (context, returnv, "\r\n");
@@ -1499,7 +1513,7 @@ void control_class_func (struct control_data *this,
          };
 
          // Read file to control channel: 
-         context->run_channel (context, 
+         run_channel (context, 
                                channel_enum (context, "file"),
                                read_rmcios, 
                                buffer_rmcios,
@@ -1540,7 +1554,6 @@ void control_class_func (struct control_data *this,
                {
                   this->command[this->index] = 0;       // NULL character
                   this->index = 0;      // record new command
-
                   this->direct_channel = execute (context, this->command, returnv);
                   if (this->direct_channel != 0)
                      direct_start = i + 1;
