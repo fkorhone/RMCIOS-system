@@ -1,4 +1,4 @@
-/* 
+﻿/* 
 RMCIOS - Reactive Multipurpose Control Input Output System
 Copyright (c) 2018 Frans Korhonen
 
@@ -152,7 +152,7 @@ const struct context_rmcios *get_rmios_context (void)
 }
 
 
-inline char *memcopy (char *dest, const char *src, int count)
+char *memcopy (char *dest, const char *src, int count)
 {
    int i;
    for (i = 0; i < count; i++)
