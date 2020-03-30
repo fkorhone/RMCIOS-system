@@ -1242,9 +1242,14 @@ int execute (const struct context_rmcios *context,
       char line_string[linelen + 1];
       //char *sparam[params] ;
       struct buffer_rmcios sparam[params];
-      sparam[0].length = 0;
+      for (i = 0; i < params; i++)
+      {
+         sparam[i] = (struct buffer_rmcios){0};
+      }
       if (params < 1)
+      {
          return 0;      // no parameters
+      }
 
       for (i = 0; i < linelen + 1; i++)
       {
@@ -1499,7 +1504,7 @@ void control_class_func (struct control_data *this,
          // get/form the filename string
          filename = param_to_string (context, paramtype, param, 
                                      0, plen, buffer);
-         struct buffer_rmcios p;
+         struct buffer_rmcios p = {0};
          p.data = (char *) filename;
          p.size = 0;
          int slen;
