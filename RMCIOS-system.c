@@ -35,6 +35,7 @@ along with RMCIOS.  If not, see <http://www.gnu.org/licenses/>.
 #include "RMCIOS-system.h"
 #include "stream_search.h"
 #include "shared_resource.h"
+#include "convert.h"
 
 // Add new class function to the system. return the id.
 int add_class_func (const struct context_rmcios *context,
@@ -85,6 +86,7 @@ struct context_rmcios funcs = {
    9,   // link - Channel for creating links.
    10,  // linked - Channel for interacting with linked channels.
    11,  // create - Channel for creating channels.
+   12,  // convert - Channel for converting parameters.
 };
 
 struct control_data
@@ -208,6 +210,7 @@ void set_channel_system_data (struct ch_system_data *p_data)
    p_data->channel_functions[funcs.link] =   add_class_func (&funcs, (class_rmcios) link_func);
    p_data->channel_functions[funcs.linked] = add_class_func (&funcs, (class_rmcios) linked_func);
    p_data->channel_functions[funcs.create] = add_class_func (&funcs, (class_rmcios) create_class_func);
+   p_data->channel_functions[funcs.convert] = add_class_func (&funcs, (class_rmcios) convert_func);
    p_data->channel_datas[funcs.control] = &cdata;
    p_data->share_registers[funcs.id] = -1;
    // Simultanous calls to linked in the whole system allowed.
