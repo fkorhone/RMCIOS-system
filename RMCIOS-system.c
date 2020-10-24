@@ -1124,9 +1124,10 @@ void id_func (void *data,
       return_string (context, returnv,
                      "id channel - Channel for getting id for a channel\r\n"
                      "write id channel newname\r\n"
-                     "read id channel\r\n"
+                     "read id ... channel\r\n"
                      "  -read identifier number for a channel\r\n"
-                     "   when multiple parameters given id for the last is returned\r\n");
+                     "   when multiple parameters given id for the last is returned\r\n"
+                     "   When parameter is not a channel name converts the parameter direcly into number \r\n");
       break;
 
    case write_rmcios:
@@ -1187,6 +1188,10 @@ void id_func (void *data,
                                     context->data)->channel_enum_pattern, 
                                     ch_name[i]);
             i++;
+         }
+         if (ireturn == 0) 
+         {
+            ireturn = param_to_integer(context, paramtype, param, num_params - 1);
          }
       }
       return_int (context, returnv, ireturn);
