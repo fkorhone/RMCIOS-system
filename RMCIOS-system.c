@@ -333,7 +333,7 @@ struct exec_queue *allocate_exec_queue_item (const struct context_rmcios
       int offset = 0;
       // Copy buffer parameters:
 
-      memcopy (dst, param.bv,
+      memcopy (dst, (const char *)param.bv,
                num_params * sizeof (struct buffer_rmcios));
 
       dst = dst + num_params * sizeof (struct buffer_rmcios);

@@ -1,3 +1,4 @@
+#include "RMCIOS-functions.h"
 #include <stdlib.h>
 #include <stdio.h>
 
@@ -45,7 +46,7 @@ void convert_func (void *data, const struct context_rmcios *context,
                   struct combo_rmcios *returnv,
                   int num_params, const union param_rmcios param)
 {
-    if (returnv == NULL || returnv->num_params==0 || num_params == 0) break;
+    if (returnv == NULL || returnv->num_params == 0 || num_params == 0) return;
 
     // Convert last parameter from param:
     int index = num_params - 1;
@@ -82,14 +83,9 @@ void convert_func (void *data, const struct context_rmcios *context,
            }
 
         case int_rmcios | (channel_rmcios << COMBINE_SHFT):
-           if (function == write_rmcios){
-               run_channel (context, returnv->param.channel, write_rmcios,
-                       int_rmcios, 0, 1,
-                       (param.iv) + index);
-           }
-           else if(function == read_rmcios) {
-               returnv
-           }
+            run_channel (context, returnv->param.channel, write_rmcios,
+                         int_rmcios, 0, 1,
+                         (const union param_rmcios)((param.iv) + index));
            break;
 
         case int_rmcios | (binary_rmcios << COMBINE_SHFT):
@@ -127,7 +123,7 @@ void convert_func (void *data, const struct context_rmcios *context,
                  struct buffer_rmcios *sreturn = returnv->param.bv;
                  int n = sreturn->size - sreturn->length;
                  int rsize ;
-                 value = param.fv[index];
+                 float value = param.fv[index];
                  if (n > 0)
                  {
                     char *end = sreturn->data + sreturn->length;
@@ -135,7 +131,7 @@ void convert_func (void *data, const struct context_rmcios *context,
                     for (n = 0; end[n] != 0; n++);
                     sreturn->length += n;
                  }
-                 else rsize=float_to_string(0,0,value) ;
+                 else rsize=float_to_string(0, 0, value) ;
 
                  sreturn->required_size = rsize ;
                  // Tell that is space for terminating null after data.
@@ -145,8 +141,8 @@ void convert_func (void *data, const struct context_rmcios *context,
         
         case float_rmcios | (channel_rmcios << COMBINE_SHFT):
             run_channel (context, returnv->param.channel, write_rmcios,
-                         float_rmcios, 0, 1,
-                         (param.fv) + index);
+                         float_rmcios, 0, 
+                         1, (const union param_rmcios)((param.fv) + index));
             break;
         
         case float_rmcios | (binary_rmcios << COMBINE_SHFT):
@@ -170,14 +166,16 @@ void convert_func (void *data, const struct context_rmcios *context,
             break;
 
         // Buffer params:
+        // TODO Change that it chan use buffer without copying when possible
         case buffer_rmcios | (int_rmcios << COMBINE_SHFT):
             {
                 struct buffer_rmcios * pbuffer = (param.bv) + index;
                 int length = pbuffer->length;
                 char string[length + 1];
+                int i;
                 for (i = 0; i < length; i++)
                 {
-                    string[i] = buffer[i];
+                    string[i] = pbuffer->data[i];
                 }
                 string[length] = 0;
                 returnv->param.iv[0] = string_to_integer (string);
@@ -189,9 +187,10 @@ void convert_func (void *data, const struct context_rmcios *context,
                 struct buffer_rmcios * pbuffer = (param.bv) + index;
                 int length = pbuffer->length;
                 char string[length + 1];
+                int i;
                 for (i = 0; i < length; i++)
                 {
-                    string[i] = buffer[i];
+                    string[i] = pbuffer->data[i];
                 }
                 string[length] = 0;
                 returnv->param.fv[0] = string_to_float (string);
@@ -219,6 +218,7 @@ void convert_func (void *data, const struct context_rmcios *context,
             }
             else if(function == read_rmcios)
             {
+                struct buffer_rmcios *sreturn = returnv->param.bv;
                 struct buffer_rmcios * pbuffer = (param.bv) + index;
                 sreturn->data = pbuffer->data;
                 sreturn->length = pbuffer->length;
@@ -230,25 +230,10 @@ void convert_func (void *data, const struct context_rmcios *context,
 
         case buffer_rmcios | (channel_rmcios << COMBINE_SHFT):
             {
-                if (function == write_rmcios) {
-                    run_channel (context, returnv->param.channel, write_rmcios, 
-                                 buffer_rmcios, 0, 1, (param.bv) + index);       
-                }
-                else if (function == read_rmcios) {
-                    // get space needed for string
-                    int len = param_string_alloc_size (context, paramtype, params, index);        
-                    {
-                        // allocate space for string
-                        char buffer[len];      
-                        const char *s;
-                        // convert to string
-                        s = param_to_string (context, paramtype, params, index, len, buffer);  
-                        ch_enum = channel_enum (context, s);   
-                        // set return value to channel enum
-                        returnv = ch_enum;  
-                    }
-                    returnv.param.channel = 
-                }
+                run_channel (context, returnv->param.channel, write_rmcios, 
+                        buffer_rmcios, 0, 
+                        1, (const union param_rmcios)((param.bv) + index));       
+
             }
             break;
         
@@ -283,13 +268,10 @@ void convert_func (void *data, const struct context_rmcios *context,
         case binary_rmcios | (int_rmcios << COMBINE_SHFT):
            {
                 struct buffer_rmcios * pbuffer = (param.bv) + index;
-                int length = pbuffer->length;
-                char * buffer = pbuffer->data;
-                char * dest = (char *) returnv->param.p;
-
-                for (i = 0; i < sizeof (int) && i < length; i++)
+                int i;
+                for (i = 0; i < sizeof (int) && i < pbuffer->length; i++)
                 {
-                    dest[i] = buffer[i];
+                   ((char *)(returnv->param.p))[i] = pbuffer->data[i];
                 }
            }
            break;
@@ -297,12 +279,10 @@ void convert_func (void *data, const struct context_rmcios *context,
         case binary_rmcios | (float_rmcios << COMBINE_SHFT):
             {
                 struct buffer_rmcios * pbuffer = (param.bv) + index;
-                int length = pbuffer->length;
-                char * buffer = pbuffer->data;
-                char * dest = (char *) returnv->param.p;
-                for (i = 0; i < sizeof (float) && i < length; i++)
+                int i;
+                for (i = 0; i < sizeof (float) && i < pbuffer->length; i++)
                 {
-                    dest[i] = buffer[i];
+                    ((char *)(returnv->param.p))[i] = pbuffer->data[i];
                 }
             }
             break;
@@ -313,12 +293,12 @@ void convert_func (void *data, const struct context_rmcios *context,
              {
                  struct buffer_rmcios * pbuffer = (param.bv) + index;
                  int length = pbuffer->length;
-                 char * buffer = pbuffer->data;
                  struct buffer_rmcios *sreturn = returnv->param.bv;
-                 for (i = sreturn->length; i < sreturn->size && si < length; i++)
+                 int i;
+                 for (i = sreturn->length; i < sreturn->size && i < length; i++)
                  {
                     // append data to buffer
-                    sreturn->data[i] = buffer[si++];    
+                    sreturn->data[i] = pbuffer->data[i];    
                  }
                  sreturn->length = i;
                  sreturn->required_size = length;
@@ -326,6 +306,7 @@ void convert_func (void *data, const struct context_rmcios *context,
             }
             else if(function == read_rmcios)
             {
+                struct buffer_rmcios *sreturn = returnv->param.bv;
                 struct buffer_rmcios * pbuffer = (param.bv) + index;
                 sreturn->data = pbuffer->data;
                 sreturn->length = pbuffer->length;
@@ -337,17 +318,10 @@ void convert_func (void *data, const struct context_rmcios *context,
 
         case binary_rmcios | (channel_rmcios << COMBINE_SHFT):
             {
-                struct buffer_rmcios sreturn = {
-                    .length = length,
-                    .size = length,
-                    .required_size = length,
-                    .trailing_size = 0,
-                    .data = (char *) buffer
-                };
-                
                 // execute write to return channel
                 run_channel (context, returnv->param.channel, write_rmcios, 
-                             binary_rmcios, 0, 1, (param.bv) + index);        
+                        binary_rmcios, 0, 
+                        1, (const union param_rmcios)((param.bv) + index));   
             }
             break;
 
