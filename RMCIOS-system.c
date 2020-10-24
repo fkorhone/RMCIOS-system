@@ -1125,7 +1125,8 @@ void id_func (void *data,
                      "id channel - Channel for getting id for a channel\r\n"
                      "write id channel newname\r\n"
                      "read id channel\r\n"
-                     "  -read identifier number for a channel\r\n");
+                     "  -read identifier number for a channel\r\n"
+                     "   when multiple parameters given id for the last is returned\r\n");
       break;
 
    case write_rmcios:
@@ -1157,13 +1158,15 @@ void id_func (void *data,
 
    case read_rmcios:
       if (num_params < 1)
+      {
          break;
-      blen = param_string_alloc_size (context, paramtype, param, 0);
+      }
+      blen = param_string_alloc_size (context, paramtype, param, num_params - 1);
       {
          char buffer[blen];
          unsigned int states[channel_state_registers];
          const char *ch_name;
-         ch_name = param_to_string (context, paramtype, param, 0,
+         ch_name = param_to_string (context, paramtype, param, num_params - 1,
                                     blen, buffer);
          for (i = 0; i < channel_state_registers; i++)
          {
