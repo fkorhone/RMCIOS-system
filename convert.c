@@ -149,7 +149,7 @@ void convert_func (void *data, const struct context_rmcios *context,
            {
              float value = param.fv[index];
              struct buffer_rmcios *sreturn = returnv->param.bv;
-             if ((sreturn->size - sreturn->length) > sizeof (value))
+             if ((sreturn->size - sreturn->length) >= sizeof (value))
              {
                 *((float *) (sreturn->data + sreturn->length)) = value;
                 sreturn->length += sizeof (value);
@@ -199,12 +199,12 @@ void convert_func (void *data, const struct context_rmcios *context,
         
         case buffer_rmcios | (buffer_rmcios << COMBINE_SHFT):
         case buffer_rmcios | (binary_rmcios << COMBINE_SHFT):
-            if(function == write_rmcios)
+            if (function == write_rmcios)
             {
                  int i = 0; // index
                  int si = 0; // Source index   
                  struct buffer_rmcios * pbuffer = (param.bv) + index;
-                 int length = pbuffer->length;
+                 int length = pbuffer->length + pbuffer->trailing_size;
                  char * buffer = pbuffer->data;
                  struct buffer_rmcios *sreturn = returnv->param.bv;
                  for (i = sreturn->length; i < sreturn->size && si < length; i++)
@@ -212,8 +212,16 @@ void convert_func (void *data, const struct context_rmcios *context,
                     // append data to buffer
                     sreturn->data[i] = buffer[si++];    
                  }
-                 sreturn->length = i;
-                 sreturn->trailing_size = 0;
+                 if ( i > pbuffer->length )
+                 {
+                    sreturn->length = pbuffer->length;
+                    sreturn->trailing_size = i - pbuffer->length;
+                 }
+                 else
+                 {
+                    sreturn->length = i;
+                    sreturn->trailing_size = 0;
+                 }
                  sreturn->required_size = length;
             }
             else if(function == read_rmcios)
@@ -318,6 +326,7 @@ void convert_func (void *data, const struct context_rmcios *context,
 
         case binary_rmcios | (channel_rmcios << COMBINE_SHFT):
             {
+            printf("BIN\n");
                 // execute write to return channel
                 run_channel (context, returnv->param.channel, write_rmcios, 
                         binary_rmcios, 0, 
