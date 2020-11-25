@@ -66,9 +66,7 @@ void run_channel_ (struct ch_system_data *data,
                    struct combo_rmcios *returnv,
                    int num_params, const union param_rmcios param);
 
-int create_channel_ (const struct context_rmcios *context,
-                     const char *namebuffer, int namelen,
-                     class_rmcios class_func, void *data);
+
 
 
 struct context_rmcios funcs = {
@@ -237,36 +235,7 @@ void set_channel_system_data (struct ch_system_data *p_data)
 // *******************************************************************
 // API FUNCTION implementation
 // *******************************************************************
-int create_channel_ (const struct context_rmcios *context,
-                     const char *namebuffer, int namelen,
-                     class_rmcios class_func, void *data)
-{
-   int ID;
-   int function_id;
-   function_id = add_class_func (context, class_func);
-   if (namebuffer[namelen] != 0)
-      write_str (context, context->errors,
-                 "ERROR! This channel implementation can only handle"
-                 " NULL char terminated channel names!\r\n", 0);
-   if ((ID = channel_enum (context, (char *) namebuffer)) == 0)
-      // Channel with this name does not exist
-   {
-      ID = add_channel (context, function_id, data);
-      if (ID != 0)
-      {
-         add_channel_enum (context, namebuffer, ID);
-      }
-   }
-   else
-      // channel with name already exists -> do only update
-   {
-      write_str (context, context->report, "updating:", 0);
-      write_str (context, context->report, namebuffer, 0);
-      write_str (context, context->report, "\n", 0);
-      update_channel (context, ID, function_id, data);
-   }
-   return ID;
-}
+
 
 struct exec_queue *allocate_exec_queue_item (const struct context_rmcios
                                              *context,
