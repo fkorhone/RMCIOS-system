@@ -221,6 +221,7 @@ void set_channel_system_data (struct ch_system_data *p_data)
    p_data->share_registers[funcs.link] = -1;
    // Simultanous calls to control allowed (Call from self needs to be working.
    p_data->share_registers[funcs.control] = -1;
+   p_data->share_registers[funcs.convert] = -1;
    add_channel_enum (&funcs, "control", funcs.control);
 
    channels = create_channel_str (&funcs, "channels",
@@ -333,7 +334,7 @@ struct exec_queue *allocate_exec_queue_item (const struct context_rmcios
       int offset = 0;
       // Copy buffer parameters:
 
-      memcopy (dst, (const char *)param.bv,
+      memcopy (dst, param.bv,
                num_params * sizeof (struct buffer_rmcios));
 
       dst = dst + num_params * sizeof (struct buffer_rmcios);
@@ -346,6 +347,7 @@ struct exec_queue *allocate_exec_queue_item (const struct context_rmcios
          newitem->param.bv[i].data = &dst[offset];
          newitem->param.bv[i].size = 0;
          newitem->param.bv[i].length = par[i].length;
+         newitem->param.bv[i].length = par[i].required_size;
          newitem->param.bv[i].trailing_size = 0;
          offset += par[i].length;
       }
@@ -1280,6 +1282,7 @@ int execute (const struct context_rmcios *context,
                {
                   // param_length= index - start index
                   sparam[param_i].length = i - start_i;
+                  sparam[param_i].required_size = sparam[param_i].length;
                }
             }
             break;
