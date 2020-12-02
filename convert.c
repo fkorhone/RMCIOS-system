@@ -232,7 +232,7 @@ void convert_func (void *data, const struct context_rmcios *context,
                 sreturn->length = pbuffer->length;
                 sreturn->size = pbuffer->size;
                 sreturn->required_size = pbuffer->required_size;
-                sreturn->trailing_size = pbuffer->required_size;
+                sreturn->trailing_size = pbuffer->trailing_size;
             }
             break;
 
@@ -326,7 +326,6 @@ void convert_func (void *data, const struct context_rmcios *context,
 
         case binary_rmcios | (channel_rmcios << COMBINE_SHFT):
             {
-            printf("BIN\n");
                 // execute write to return channel
                 run_channel (context, returnv->param.channel, write_rmcios, 
                         binary_rmcios, 0, 
