@@ -1195,8 +1195,6 @@ void id_func (void *data,
    case help_rmcios:
       return_string (context, returnv,
                      "id channel - Channel for getting id for a channel\r\n"
-                     "write id channel newname\r\n"
-                     "   Add name for channel or update existing name"
                      "read id ... channel\r\n"
                      "  -read identifier number for a channel\r\n"
                      "   when multiple parameters given id for the last is returned\r\n"
@@ -1208,30 +1206,6 @@ void id_func (void *data,
       {
          break;
       }
-
-      p0len = param_string_alloc_size (context, paramtype, param, 0);
-      p1len = param_string_length (context, paramtype, param, 1) + 1;
-      {
-         char buffer0[p0len];
-         const char *channelname;
-
-         // Allocate memory for the new name
-         char *newname = allocate_storage (context, p1len, 0);
-         channelname = param_to_string (context, paramtype, param, 0, p0len, buffer0);
-
-         param_to_string (context, paramtype, param, 1, p1len, newname);
-         // Add the new name
-         printf("Adding name: %0 %s\n", channelname);
-         add_search_word_synonym (((struct ch_system_data *) context->data)->
-                                  channel_enum_pattern, channelname,
-                                  (const char *) newname);
-         // Remove the old name
-         if (function == setup_rmcios)
-            remove_search_word (((struct ch_system_data *) context->data)->
-                                channel_enum_pattern, channelname);
-
-      }
-      break;
 
    case read_rmcios:
       if (num_params < 1)
