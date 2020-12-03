@@ -89,7 +89,6 @@ void convert_func (void *data, const struct context_rmcios *context,
            break;
 
         case int_rmcios | (binary_rmcios << COMBINE_SHFT):
-           if(function == write_rmcios)
            {
              int value = param.iv[index];
              struct buffer_rmcios *sreturn = returnv->param.bv;
@@ -337,6 +336,35 @@ void convert_func (void *data, const struct context_rmcios *context,
             {
                 struct combo_rmcios *creturn = returnv->param.cv;
                 convert_func (data, context, channel, function, paramtype, creturn, num_params, param);
+            }
+            break;
+
+        case combo_rmcios | (int_rmcios << COMBINE_SHFT):
+        case combo_rmcios | (float_rmcios << COMBINE_SHFT):
+        case combo_rmcios | (buffer_rmcios << COMBINE_SHFT):
+        case combo_rmcios | (binary_rmcios << COMBINE_SHFT):
+        case combo_rmcios | (channel_rmcios << COMBINE_SHFT):
+        case combo_rmcios | (combo_rmcios << COMBINE_SHFT):
+            {
+                int combo_index = 0;
+                int param_index = 0;            
+                struct combo_rmcios *combo_param;
+                
+                // Find on which combo parameter array desired parameter is located
+                for (combo_index = 0; 
+                     (param_index + param.cv[combo_index].num_params) < num_params;
+                     combo_index++)
+                { 
+                    param_index += param.cv[combo_index].num_params;
+                }
+                combo_param = (param.cv) + combo_index; 
+            
+                // Calculate the index of the parameter within combo parameter  
+                param_index = num_params - param_index;
+                
+                convert_func (data, context, channel, function,
+                              combo_param->paramtype, returnv, 
+                              param_index, combo_param->param);
             }
             break;
     }

@@ -46,6 +46,17 @@ enum test_cases {
     TEST_BINARY_TO_BUFFER_APPEND,
     TEST_BINARY_TO_BUFFER_OVERFLOW,
     TEST_BINARY_TO_BUFFER_REQUIRED_SIZE,
+
+    TEST_COMBO_TO_INT,
+    TEST_COMBO_TO_FLOAT,
+    TEST_COMBO_TO_CHANNEL,
+    TEST_COMBO_TO_BINARY,
+    TEST_COMBO_TO_BUFFER,
+    TEST_COMBO_TO_COMBO_BUFFER,
+    TEST_COMBO_INT_TO_BUFFER,
+    TEST_COMBO_MULTIPLE_VALUES,
+    TEST_COMBO_MULTIPLE_VALUES_SECOND_SET,
+
     TOTAL_TEST_CASES
 };
 
@@ -303,6 +314,16 @@ int main(void)
                       1, (const union param_rmcios)&value);
 
         TEST_ASSERT_EQUAL_INT( ireturn, 6921 );
+        TEST_ASSERT_EQUAL_INT( retbuffer.required_size, sizeof(ireturn) );
+
+        value = 1132;
+        retbuffer.length = 0; 
+        retbuffer.size = 0; 
+        retbuffer.required_size = 0; 
+        convert_func (0, 0, 0, read_rmcios, int_rmcios, &returnv,
+                      1, (const union param_rmcios)&value);
+        TEST_ASSERT_EQUAL_INT( retbuffer.required_size, sizeof(ireturn) );
+        TEST_ASSERT_EQUAL_INT( ireturn, 6921 ); // Should not change
     }
 
     TEST_CASE(TEST_INT_TO_COMBO_INT,"")
