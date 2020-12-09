@@ -1335,6 +1335,7 @@ int execute (const struct context_rmcios *context,
          {
             //param_length=  index - start index
             sparam[param_i].length = i - start_i;
+            sparam[param_i].required_size = sparam[param_i].length;
          }
          if (prev == ' ' && bstr == 0)
             // New parameter
@@ -1684,7 +1685,6 @@ void create_class_func (void *this,
 
          if(class_ptr_size != sizeof(class_func) ||  data_ptr_size != sizeof(void *) )
          {
-            printf("sizes: %d %d\n", class_ptr_size, data_ptr_size);
             write_str (context, context->errors,
                   "ERROR! Attemp of creating channel with incompatible "
                   "pointer parameter size\r\n", 0);
