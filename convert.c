@@ -225,13 +225,7 @@ void convert_func (void *data, const struct context_rmcios *context,
             }
             else if(function == read_rmcios)
             {
-                struct buffer_rmcios *sreturn = returnv->param.bv;
-                struct buffer_rmcios * pbuffer = (param.bv) + index;
-                sreturn->data = pbuffer->data;
-                sreturn->length = pbuffer->length;
-                sreturn->size = pbuffer->size;
-                sreturn->required_size = pbuffer->required_size;
-                sreturn->trailing_size = pbuffer->trailing_size;
+                returnv->param = (union param_rmcios) ((param.bv) + index);
             }
             break;
 
@@ -313,13 +307,7 @@ void convert_func (void *data, const struct context_rmcios *context,
             }
             else if(function == read_rmcios)
             {
-                struct buffer_rmcios *sreturn = returnv->param.bv;
-                struct buffer_rmcios * pbuffer = (param.bv) + index;
-                sreturn->data = pbuffer->data;
-                sreturn->length = pbuffer->length;
-                sreturn->size = pbuffer->size;
-                sreturn->required_size = pbuffer->required_size;
-                sreturn->trailing_size = pbuffer->required_size;
+                returnv->param = (union param_rmcios) ((param.bv) + index);
             }
             break;
 
